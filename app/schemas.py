@@ -29,8 +29,26 @@ class UsageStats(BaseModel):
     total_tokens: int = 0
 
 
+class RouteStep(BaseModel):
+    provider: str
+    requested_model: str
+    resolved_model: Optional[str] = None
+    status: str
+    source: str = "router"
+
+
+class CostEstimate(BaseModel):
+    openai_usd: float = 0.0
+    gemini_usd: float = 0.0
+    provider_used_usd: float = 0.0
+    currency: str = "USD"
+    pricing_basis: str = "estimated_from_tokens"
+
+
 class ChatResponse(BaseModel):
     content: str
     provider: str
     model: str
     usage: UsageStats
+    route_path: List[RouteStep] = Field(default_factory=list)
+    cost_estimate: Optional[CostEstimate] = None
