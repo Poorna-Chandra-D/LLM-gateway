@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import secrets
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Form, Response
@@ -540,6 +541,56 @@ async def handle_logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(key="session_token")
     return response
+
+
+@app.post("/api-key")
+def generate_api_key(
+    db: Session = Depends(get_db),
+):
+    """Generate a new API key for programmatic access.
+    
+    Usage:
+        curl -X POST https://llm-gateway-api-og50.onrender.com/api-key
+        
+    Returns:
+        {
+            "api_key": "llm_key_...",
+            "message": "Save this key securely. You won't see it again."
+        }
+    """
+    try:
+        # Generate a random 32-byte key encoded as base64url
+        random_bytes = secrets.token_urlsafe(32)
+        api_key_value = f"llm_key_{random_bytes}"
+        
+        # Store in database
+        new_key = ApiKey(
+            key=api_key_value,
+            owner="user",  # Can be customized later if needed
+        )
+        db.add(new_key)
+        db.commit()
+        db.refresh(new_key)
+        
+        logger.info(f"Generated new API key: {new_key.id}")
+        
+        usage_instructions = (
+            f"curl -X POST https://llm-gateway-api-og50.onrender.com/chat "
+            f"-H 'X-API-Key: {api_key_value}' "
+            f"-H 'Content-Type: application/json' "
+            f"-d '{{\"messages\": [{{\"role\": \"user\", \"content\": \"Hello\"}}], \"model\": \"gpt-4o\"}}'"
+        )
+        
+        return {
+            "api_key": api_key_value,
+            "message": "Save this key securely. You won't see it again.",
+            "usage": usage_instructions
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error generating API key: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate API key")
+
 
 @app.get("/health")
 def health_check():
