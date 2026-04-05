@@ -371,6 +371,153 @@
             background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(183, 28, 28, 0.05) 100%);
         }
 
+        /* Message Content Formatting */
+        .message-content {
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .message-content code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #a78bfa;
+        }
+
+        .message-content pre {
+            background: linear-gradient(135deg, rgba(15, 15, 23, 0.8) 0%, rgba(12, 12, 20, 0.6) 100%);
+            border: 1px solid rgba(167, 139, 250, 0.2);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin: 8px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #d1d5db;
+            position: relative;
+        }
+
+        .message-content pre code {
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+            color: inherit;
+            font-size: 0.9em;
+        }
+
+        .code-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(167, 139, 250, 0.15);
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .code-copy-btn {
+            background: transparent;
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            color: var(--accent);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .code-copy-btn:hover {
+            background: rgba(167, 139, 250, 0.15);
+            border-color: var(--accent);
+        }
+
+        .code-copy-btn.copied {
+            color: var(--success);
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .message-content strong {
+            font-weight: 700;
+            color: var(--accent-bright);
+        }
+
+        .message-content em {
+            font-style: italic;
+            color: #cbd5e1;
+        }
+
+        .message-content ul,
+        .message-content ol {
+            margin: 8px 0 8px 20px;
+            padding: 0;
+        }
+
+        .message-content li {
+            margin: 4px 0;
+            line-height: 1.6;
+        }
+
+        .message-content ul li::marker {
+            color: var(--accent);
+        }
+
+        .message-content ol li::marker {
+            color: var(--accent);
+        }
+
+        .message-content blockquote {
+            border-left: 4px solid var(--accent);
+            padding-left: 12px;
+            margin: 8px 0;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .message-content h1,
+        .message-content h2,
+        .message-content h3,
+        .message-content h4 {
+            margin: 10px 0 8px 0;
+            color: var(--accent-bright);
+            font-weight: 700;
+        }
+
+        .message-content h1 { font-size: 1.4em; }
+        .message-content h2 { font-size: 1.3em; }
+        .message-content h3 { font-size: 1.2em; }
+        .message-content h4 { font-size: 1.1em; }
+
+        .message-content a {
+            color: var(--accent);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(167, 139, 250, 0.3);
+            transition: all 0.2s;
+        }
+
+        .message-content a:hover {
+            color: var(--accent-bright);
+            border-bottom-color: var(--accent-bright);
+        }
+
+        .message-content hr {
+            border: none;
+            border-top: 1px solid rgba(167, 139, 250, 0.2);
+            margin: 12px 0;
+        }
+
         .input-area {
             padding: 18px 24px;
             background: linear-gradient(180deg, rgba(17, 17, 26, 0.8) 0%, rgba(15, 15, 23, 0.6) 100%);
@@ -1646,12 +1793,114 @@
         }
 
         // ═══════════ CHAT HELPERS ═══════════
+        function formatMessage(content) {
+            // Escape HTML special characters but preserve formatting
+            let formatted = content;
+            
+            // Process code blocks first (```language code ```)
+            formatted = formatted.replace(/```([\s\S]*?)```/g, (match, code) => {
+                const lines = code.trim().split('\n');
+                const firstLine = lines[0].trim();
+                const isLanguage = firstLine && !firstLine.includes(' ') && firstLine.length < 20;
+                const language = isLanguage ? firstLine : '';
+                const actualCode = isLanguage ? lines.slice(1).join('\n') : code.trim();
+                
+                // Escape code content
+                let escapedCode = actualCode
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                
+                return `<div class="code-block-header">${language || 'code'}<button class="code-copy-btn" onclick="copyCode(this)">📋 Copy</button></div><pre><code>${escapedCode}</code></pre>`;
+            });
+            
+            // Process inline code (single backticks)
+            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Process bold (**text** or __text__)
+            formatted = formatted.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+            
+            // Process italic (*text* or _text_)
+            formatted = formatted.replace(/\*([^\*]+)\*/g, '<em>$1</em>');
+            formatted = formatted.replace(/_([^_]+)_/g, '<em>$1</em>');
+            
+            // Process headings (# ## ### #### on new lines)
+            formatted = formatted.replace(/^#### (.*?)$/gm, '<h4>$1</h4>');
+            formatted = formatted.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+            formatted = formatted.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+            formatted = formatted.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+            
+            // Process unordered lists (- item or * item)
+            formatted = formatted.replace(/(?:^|\n)((?:[\s]*[-*] .+(?:\n|$))+)/gm, (match) => {
+                const items = match.trim().split('\n').filter(l => l.trim());
+                const listItems = items.map(item => {
+                    const content = item.replace(/^[\s]*[-*]\s+/, '').trim();
+                    return `<li>${content}</li>`;
+                }).join('');
+                return `<ul>${listItems}</ul>`;
+            });
+            
+            // Process ordered lists (1. 2. 3. etc)
+            formatted = formatted.replace(/(?:^|\n)((?:[\s]*\d+\. .+(?:\n|$))+)/gm, (match) => {
+                const items = match.trim().split('\n').filter(l => l.trim());
+                const listItems = items.map(item => {
+                    const content = item.replace(/^[\s]*\d+\.\s+/, '').trim();
+                    return `<li>${content}</li>`;
+                }).join('');
+                return `<ol>${listItems}</ol>`;
+            });
+            
+            // Process blockquotes (> text)
+            formatted = formatted.replace(/(?:^|\n)(?:> (.+?)(?:\n|$))+/gm, (match) => {
+                const lines = match.split('\n').filter(l => l.trim());
+                const quotes = lines.map(line => line.replace(/^>\s+/, '').trim()).join('\n');
+                return `<blockquote>${quotes}</blockquote>`;
+            });
+            
+            // Process horizontal rules (---, ***, ___)
+            formatted = formatted.replace(/(?:^|\n)(?:---|\*\*\*|___)(?:\n|$)/g, '<hr>');
+            
+            // Process line breaks (preserve new lines)
+            formatted = formatted.replace(/\n\n+/g, '</p><p>');
+            
+            return `<div class="message-content"><p>${formatted}</p></div>`;
+        }
+
+        function copyCode(btn) {
+            const pre = btn.closest('.code-block-header').nextElementSibling;
+            if (!pre || pre.tagName !== 'PRE') return;
+            
+            const code = pre.querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(() => {
+                showToast('Failed to copy code', 'error', 2000);
+            });
+        }
+
         function appendMessage(role, content, isError) {
             const div = document.createElement('div');
             let classes = `message ${role}-message`;
             if (isError) classes += ' error-msg';
             div.className = classes;
-            div.textContent = content;
+            
+            // Format content for bot messages
+            if (role === 'bot' && !isError) {
+                div.innerHTML = formatMessage(content);
+            } else {
+                // User messages and errors displayed as plain text
+                div.textContent = content;
+            }
+            
             chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
