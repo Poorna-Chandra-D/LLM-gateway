@@ -1,21 +1,4 @@
 services:
-  # PostgreSQL Database
-  - type: pserv
-    name: llm-gateway-db
-    plan: free
-    envVars:
-      - key: POSTGRES_DB
-        value: llm_gateway
-      - key: POSTGRES_USER
-        value: postgres
-      - key: POSTGRES_PASSWORD
-        value: ${POSTGRES_PASSWORD}
-
-  # Redis Cache
-  - type: redis
-    name: llm-gateway-cache
-    plan: free
-
   # API Server
   - type: web
     name: llm-gateway-api
@@ -25,14 +8,9 @@ services:
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: llm-gateway-db
-          property: connectionString
+        sync: false
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: llm-gateway-cache
-          property: connectionString
+        sync: false
       - key: OPENAI_API_KEY
         sync: false
       - key: GEMINI_API_KEY
