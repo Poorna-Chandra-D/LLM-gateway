@@ -2,7 +2,6 @@ services:
   # PostgreSQL Database
   - type: pserv
     name: llm-gateway-db
-    runtime: postgres15
     plan: free
     envVars:
       - key: POSTGRES_DB
@@ -15,8 +14,8 @@ services:
   # Redis Cache
   - type: redis
     name: llm-gateway-cache
-    runtime: redis7
     plan: free
+    ipAllowList: []
 
   # API Server
   - type: web
