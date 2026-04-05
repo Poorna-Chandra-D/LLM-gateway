@@ -1,0 +1,49 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: llm-gateway-db
+    runtime: postgres15
+    plan: free
+    ipAllowList: []  # Allow all IPs
+    envVars:
+      - key: POSTGRES_DB
+        value: llm_gateway
+      - key: POSTGRES_USER
+        value: postgres
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+
+  # Redis Cache
+  - type: redis
+    name: llm-gateway-cache
+    runtime: redis7
+    plan: free
+    ipAllowList: []
+
+  # API Server
+  - type: web
+    name: llm-gateway-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    buildCommand: ""
+    startCommand: "./entrypoint.sh"
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: llm-gateway-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: llm-gateway-cache
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+    healthCheckPath: /health
+    maxInstances: 1
+    minInstances: 1
