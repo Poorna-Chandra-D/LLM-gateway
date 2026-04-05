@@ -2,9 +2,7 @@ services:
   # PostgreSQL Database
   - type: pserv
     name: llm-gateway-db
-    runtime: postgres15
     plan: free
-    ipAllowList: []
     envVars:
       - key: POSTGRES_DB
         value: llm_gateway
@@ -17,8 +15,6 @@ services:
   - type: redis
     name: llm-gateway-cache
     plan: free
-    maxmemoryPolicy: noeviction
-    ipAllowList: []
 
   # API Server
   - type: web
