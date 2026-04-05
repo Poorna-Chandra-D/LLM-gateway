@@ -2,7 +2,9 @@ services:
   # PostgreSQL Database
   - type: pserv
     name: llm-gateway-db
+    runtime: postgres15
     plan: free
+    ipAllowList: []
     envVars:
       - key: POSTGRES_DB
         value: llm_gateway
@@ -15,6 +17,7 @@ services:
   - type: redis
     name: llm-gateway-cache
     plan: free
+    maxmemoryPolicy: noeviction
     ipAllowList: []
 
   # API Server
@@ -23,7 +26,6 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    startCommand: ./entrypoint.sh
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
@@ -34,7 +36,7 @@ services:
         fromService:
           type: redis
           name: llm-gateway-cache
-          property: redisUrl
+          property: connectionString
       - key: OPENAI_API_KEY
         sync: false
       - key: GEMINI_API_KEY
