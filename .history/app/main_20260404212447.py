@@ -1,0 +1,475 @@
+import os
+import time
+import logging
+from typing import Optional
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Float, create_engine, func
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+from app.schemas import ChatRequest, ChatResponse, CostEstimate
+from app.providers import ProviderError
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# ---------- Cost estimation (USD per 1K tokens; can be overridden via env) ----------
+OPENAI_PROMPT_USD_PER_1K = float(os.getenv("OPENAI_PROMPT_USD_PER_1K", "0.005"))
+OPENAI_COMPLETION_USD_PER_1K = float(os.getenv("OPENAI_COMPLETION_USD_PER_1K", "0.015"))
+GEMINI_PROMPT_USD_PER_1K = float(os.getenv("GEMINI_PROMPT_USD_PER_1K", "0.00125"))
+GEMINI_COMPLETION_USD_PER_1K = float(os.getenv("GEMINI_COMPLETION_USD_PER_1K", "0.00375"))
+
+
+def _cost_from_tokens(
+    *,
+    prompt_tokens: int,
+    completion_tokens: int,
+    prompt_rate_per_1k: float,
+    completion_rate_per_1k: float,
+) -> float:
+    prompt_cost = (prompt_tokens / 1000.0) * prompt_rate_per_1k
+    completion_cost = (completion_tokens / 1000.0) * completion_rate_per_1k
+    return round(prompt_cost + completion_cost, 8)
+
+
+def _build_cost_estimate(response: ChatResponse) -> CostEstimate:
+    prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+    completion_tokens = response.usage.completion_tokens if response.usage else 0
+
+    openai_cost = _cost_from_tokens(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        prompt_rate_per_1k=OPENAI_PROMPT_USD_PER_1K,
+        completion_rate_per_1k=OPENAI_COMPLETION_USD_PER_1K,
+    )
+    gemini_cost = _cost_from_tokens(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        prompt_rate_per_1k=GEMINI_PROMPT_USD_PER_1K,
+        completion_rate_per_1k=GEMINI_COMPLETION_USD_PER_1K,
+    )
+
+    provider_name = (response.provider or "").lower()
+    if "openai" in provider_name:
+        provider_used_cost = openai_cost
+    elif "gemini" in provider_name:
+        provider_used_cost = gemini_cost
+    elif "cache" in provider_name or "redis" in provider_name:
+        provider_used_cost = min(openai_cost, gemini_cost)
+    elif "mock" in provider_name:
+        # Mock provider has no cost (simulated data)
+        provider_used_cost = 0.0
+    else:
+        # For unknown providers, keep the value usage-derived and conservative.
+        provider_used_cost = min(openai_cost, gemini_cost)
+
+    return CostEstimate(
+        openai_usd=openai_cost,
+        gemini_usd=gemini_cost,
+        provider_used_usd=round(provider_used_cost, 8),
+        currency="USD",
+        pricing_basis="estimated_from_tokens",
+    )
+
+app = FastAPI(title="Resilient LLM Gateway - Sprint 2")
+
+# ---------- DB setup ----------
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://gateway:gatewaypass@postgres:5432/gatewaydb",  # docker-compose default connects via internal docker network port 5432
+)
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+
+# ---------- ORM models (match your Alembic tables) ----------
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(255), unique=True, nullable=False)
+    owner = Column(String(255), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class RequestLog(Base):
+    __tablename__ = "requests"
+
+    id = Column(Integer, primary_key=True)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=True)
+    endpoint = Column(String(255), nullable=False)
+    provider = Column(String(255), nullable=True)
+    model = Column(String(255), nullable=True)
+    status_code = Column(Integer, nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class BudgetConfig(Base):
+    __tablename__ = "budget_configs"
+
+    id = Column(Integer, primary_key=True)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=False, unique=False)
+    provider = Column(String(255), nullable=False)  # "openai", "gemini", "all"
+    monthly_budget_usd = Column(Float, nullable=False)  # e.g., 10.0
+    warning_threshold_percent = Column(Float, default=80.0)  # e.g., 80% = warn at $8
+    hard_limit_percent = Column(Float, default=100.0)  # e.g., 100% = block at $10
+    is_enabled = Column(String(255), default="true")  # "true" or "false"
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now())
+
+
+class CostLog(Base):
+    __tablename__ = "cost_logs"
+
+    id = Column(Integer, primary_key=True)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=False)
+    provider = Column(String(255), nullable=False)
+    cost_usd = Column(Float, nullable=False)
+    tokens_used = Column(Integer, default=0)
+    month = Column(String(7), nullable=False)  # "YYYY-MM" format
+    created_at = Column(DateTime, server_default=func.now())
+
+
+# ---------- DB dependency ----------
+def get_db():
+    """Yield a SQLAlchemy session; ensures close after request."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ---------- Request logger ----------
+def log_request(
+    *,
+    endpoint: str,
+    status_code: int,
+    latency_ms: int,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    api_key_id: Optional[int] = None,
+) -> None:
+    """Write an observability record to the requests table."""
+    db: Session = SessionLocal()
+    try:
+        row = RequestLog(
+            api_key_id=api_key_id,
+            endpoint=endpoint,
+            provider=provider,
+            model=model,
+            status_code=status_code,
+            latency_ms=latency_ms,
+        )
+        db.add(row)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("Failed to log request: %s", exc)
+    finally:
+        db.close()
+
+
+# ---------- Cost tracking and budget management ----------
+def log_cost(
+    *,
+    api_key_id: int,
+    provider: str,
+    cost_usd: float,
+    tokens_used: int = 0,
+) -> None:
+    """Log cost for a request."""
+    from datetime import datetime
+    current_month = datetime.now().strftime("%Y-%m")
+    
+    db: Session = SessionLocal()
+    try:
+        row = CostLog(
+            api_key_id=api_key_id,
+            provider=provider.lower(),
+            cost_usd=cost_usd,
+            tokens_used=tokens_used,
+            month=current_month,
+        )
+        db.add(row)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.error("Failed to log cost: %s", exc)
+    finally:
+        db.close()
+
+
+def get_monthly_cost(
+    api_key_id: int,
+    provider: str,
+    db: Session,
+) -> float:
+    """Get total cost for a provider in the current month."""
+    from datetime import datetime
+    from sqlalchemy import and_
+    
+    current_month = datetime.now().strftime("%Y-%m")
+    result = db.query(func.sum(CostLog.cost_usd)).filter(
+        and_(
+            CostLog.api_key_id == api_key_id,
+            CostLog.provider == provider.lower(),
+            CostLog.month == current_month,
+        )
+    ).scalar()
+    
+    return float(result or 0.0)
+
+
+def get_budget_status(
+    api_key_id: int,
+    db: Session,
+) -> dict:
+    """Get budget status for all providers."""
+    from datetime import datetime
+    
+    budgets = db.query(BudgetConfig).filter(
+        BudgetConfig.api_key_id == api_key_id,
+        BudgetConfig.is_enabled == "true"
+    ).all()
+    
+    status = {}
+    for budget in budgets:
+        provider = budget.provider.lower()
+        current_cost = get_monthly_cost(api_key_id, provider, db)
+        limit = budget.monthly_budget_usd
+        percent = (current_cost / limit * 100) if limit > 0 else 0
+        
+        status[provider] = {
+            "budget": limit,
+            "spent": round(current_cost, 8),
+            "percent": round(percent, 1),
+            "warning_threshold": budget.warning_threshold_percent,
+            "hard_limit_percent": budget.hard_limit_percent,
+            "status": "critical" if percent >= budget.hard_limit_percent else (
+                "warning" if percent >= budget.warning_threshold_percent else "ok"
+            ),
+        }
+    
+    return status
+
+
+def check_budget_allowed(
+    api_key_id: int,
+    provider: str,
+    db: Session,
+) -> tuple[bool, Optional[str]]:
+    """Check if a request is allowed under budget constraints.
+    
+    Returns: (is_allowed, warning_message)
+    """
+    budget = db.query(BudgetConfig).filter(
+        BudgetConfig.api_key_id == api_key_id,
+        BudgetConfig.provider == provider.lower(),
+        BudgetConfig.is_enabled == "true"
+    ).first()
+    
+    if not budget:
+        return True, None  # No budget set, always allowed
+    
+    current_cost = get_monthly_cost(api_key_id, provider, db)
+    limit = budget.monthly_budget_usd
+    percent = (current_cost / limit * 100) if limit > 0 else 0
+    
+    # Check hard limit
+    if percent >= budget.hard_limit_percent:
+        return False, f"Budget limit reached for {provider}: ${current_cost:.8f} / ${limit:.2f}"
+    
+    # Return warning if approaching threshold
+    if percent >= budget.warning_threshold_percent:
+        warning = f"Approaching budget for {provider}: {percent:.1f}% (${current_cost:.8f} / ${limit:.2f})"
+        return True, warning
+    
+    return True, None
+
+
+# ---------- Auth helper (inline to avoid circular import) ----------
+def verify_api_key(
+    x_api_key: str = Header(None, alias="X-API-Key"),
+    db: Session = Depends(get_db),
+) -> ApiKey:
+    """Validate X-API-Key header against the api_keys table."""
+    if x_api_key is None:
+        raise HTTPException(status_code=403, detail="Missing X-API-Key header")
+
+    api_key = db.query(ApiKey).filter(ApiKey.key == x_api_key).first()
+    if api_key is None:
+        raise HTTPException(status_code=403, detail="Invalid API key")
+
+    return api_key
+
+
+# ---------- Routes ----------
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard():
+    """Serve the frontend dashboard UI."""
+    try:
+        with open("app/dashboard.html", "r") as f:
+            return HTMLResponse(content=f.read())
+    except Exception as e:
+        logger.error("Failed to load dashboard: %s", e)
+        raise HTTPException(status_code=500, detail="Dashboard not found")
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/health/detailed")
+def health_detailed():
+    """Return connectivity status for API, PostgreSQL, and Redis."""
+    result = {"api": "ok", "postgres": "error", "redis": "error"}
+
+    # Check PostgreSQL
+    try:
+        from sqlalchemy import text
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        result["postgres"] = "ok"
+    except Exception:
+        pass
+
+    # Check Redis
+    try:
+        from app.cache import redis_client
+        redis_client.ping()
+        result["redis"] = "ok"
+    except Exception:
+        pass
+
+    return result
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(
+    body: ChatRequest,
+    api_key: ApiKey = Depends(verify_api_key),
+    db: Session = Depends(get_db),
+):
+    """
+    Main chat endpoint.
+
+    1. Pydantic validates the request body automatically
+    2. verify_api_key enforces auth via the X-API-Key header
+    3. Check budget constraints
+    4. route_request tries OpenAI, falls back to Gemini
+    5. Log cost and check budget status
+    6. log_request captures observability data to PostgreSQL
+    7. Returns a standardised ChatResponse
+    """
+    # Lazy import to avoid circular dependency at module load time
+    from app.router import route_request
+    from app.cache import get_cached_response, set_cached_response
+    import hashlib
+
+    start = time.perf_counter()
+
+    # --- Two-layer cache key strategy ---
+    import json
+
+    # Layer 1: Full request state (model + generation settings + full messages array)
+    full_request_state = {
+        "model": body.model,
+        "temperature": body.temperature,
+        "max_tokens": body.max_tokens,
+        "messages": [{"role": m.role, "content": m.content} for m in body.messages],
+    }
+    messages_serialized = json.dumps(full_request_state, sort_keys=True)
+    exact_hash = hashlib.sha256(messages_serialized.encode("utf-8")).hexdigest()
+    exact_key = f"chat:{api_key.id}:{exact_hash}"
+
+    # Layer 2: Last user message only (for repeat-question cache hits)
+    last_user_msg = ""
+    for m in reversed(body.messages):
+        if m.role == "user":
+            last_user_msg = m.content
+            break
+    prompt_cache_basis = f"{body.model}:{last_user_msg}"
+    prompt_hash = hashlib.sha256(prompt_cache_basis.encode("utf-8")).hexdigest()
+    prompt_key = f"prompt:{api_key.id}:{prompt_hash}"
+
+    # Check cache — exact match first, then prompt-level match
+    cached_data = get_cached_response(exact_key) or get_cached_response(prompt_key)
+    if cached_data:
+        response = ChatResponse(**cached_data)
+        response.route_path = [
+            {
+                "provider": "redis_cache",
+                "requested_model": body.model,
+                "resolved_model": response.model,
+                "status": "success",
+                "source": "cache",
+            }
+        ]
+        response.cost_estimate = _build_cost_estimate(response)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        log_request(
+            endpoint="/chat",
+            status_code=200,
+            latency_ms=latency_ms,
+            provider="redis_cache",
+            model=response.model,
+            api_key_id=api_key.id,
+        )
+        return response
+
+    try:
+        response, route_path = route_request(body)
+        response.route_path = route_path
+        response.cost_estimate = _build_cost_estimate(response)
+        status_code = 200
+
+        
+        # Cache the successful response under both keys
+        response_dict = response.model_dump() if hasattr(response, 'model_dump') else response.dict()
+        set_cached_response(exact_key, response_dict)
+        set_cached_response(prompt_key, response_dict)
+        
+        # Log cost for budget tracking
+        if response.cost_estimate and response.provider:
+            cost = response.cost_estimate.provider_used_usd
+            tokens = response.usage.total_tokens if response.usage else 0
+            log_cost(
+                api_key_id=api_key.id,
+                provider=response.provider,
+                cost_usd=cost,
+                tokens_used=tokens,
+            )
+    except ProviderError as exc:
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        log_request(
+            endpoint="/chat",
+            status_code=502,
+            latency_ms=latency_ms,
+            provider=exc.provider,
+            model=body.model,
+            api_key_id=api_key.id,
+        )
+        logger.error("All providers failed: %s", exc)
+        raise HTTPException(status_code=502, detail="All LLM providers failed") from exc
+
+    latency_ms = int((time.perf_counter() - start) * 1000)
+
+    # Log the successful request
+    log_request(
+        endpoint="/chat",
+        status_code=status_code,
+        latency_ms=latency_ms,
+        provider=response.provider,
+        model=response.model,
+        api_key_id=api_key.id,
+    )
+
+    return response

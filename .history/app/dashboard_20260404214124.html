@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resilient LLM Gateway</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #080810;
+            --panel-bg: #0f0f17;
+            --card-bg: #16161f;
+            --border-color: rgba(255,255,255,0.08);
+            --border-hover: rgba(255,255,255,0.15);
+            --text-main: #f0f0f8;
+            --text-muted: #7a7a8e;
+            --text-dim: #4a4a5e;
+            --accent: #a78bfa;
+            --accent-glow: rgba(167,139,250,0.2);
+            --accent-bright: #c4b5fd;
+            --user-msg: #7c3aed;
+            --user-msg-hover: #8b5cf6;
+            --bot-msg: #1f1f2e;
+            --success: #10b981;
+            --success-glow: rgba(16,185,129,0.2);
+            --success-dim: rgba(16,185,129,0.12);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245,158,11,0.2);
+            --warning-dim: rgba(245,158,11,0.12);
+            --error: #ef4444;
+            --error-glow: rgba(239,68,68,0.2);
+            --error-dim: rgba(239,68,68,0.12);
+            --info: #06b6d4;
+            --info-glow: rgba(6,182,212,0.2);
+            --info-dim: rgba(6,182,212,0.12);
+            --openai-color: #10a37f;
+            --gemini-color: #8ab4f8;
+            --mock-color: #f87171;
+            --cache-color: #34d399;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+            --shadow-xl: 0 16px 48px rgba(0,0,0,0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ═══════════ TOP NAV BAR ═══════════ */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 28px;
+            background: linear-gradient(180deg, rgba(18,18,26,0.99) 0%, rgba(20,20,30,0.95) 100%);
+            border-bottom: 1px solid rgba(167,139,250,0.15);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 16px var(--accent-glow);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .logo-icon:hover {
+            transform: scale(1.08) translateY(-2px);
+            box-shadow: 0 6px 24px var(--accent-glow);
+        }
+
+        .top-bar h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--text-main);
+            background: linear-gradient(135deg, var(--text-main), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .top-bar h1 span {
+            color: var(--accent);
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .health-indicators {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            padding: 8px 14px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .health-indicators:hover {
+            background: rgba(0,0,0,0.4);
+            border-color: rgba(255,255,255,0.12);
+        }
+
+        .health-dot {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            transition: color 0.3s ease;
+        }
+
+        .health-dot:hover {
+            color: var(--text-main);
+        }
+
+        .health-dot .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-dim);
+            transition: background-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s ease;
+        }
+
+        .health-dot .dot.ok {
+            background-color: var(--success);
+            box-shadow: 0 0 10px rgba(52,211,153,0.7);
+            animation: statusPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .health-dot .dot.err {
+            background-color: var(--error);
+            box-shadow: 0 0 10px rgba(248,113,113,0.7);
+        }
+
+        .api-key-input {
+            background: linear-gradient(135deg, rgba(26,26,40,0.8), rgba(26,26,40,0.6));
+            border: 1px solid rgba(167,139,250,0.2);
+            color: var(--text-main);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            font-family: inherit;
+            width: 240px;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .api-key-input:hover {
+            background: linear-gradient(135deg, rgba(26,26,40,0.9), rgba(26,26,40,0.7));
+            border-color: rgba(167,139,250,0.3);
+        }
+
+        .api-key-input:focus {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(26,26,40,1), rgba(26,26,40,0.8));
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* ═══════════ SESSION STATS BAR ═══════════ */
+        .stats-bar {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 0 24px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            height: 44px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 20px;
+            height: 100%;
+            border-right: 1px solid var(--border-color);
+            font-size: 0.78rem;
+        }
+
+        .stat-item:last-child { border-right: none; }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.68rem;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--text-main);
+            font-variant-numeric: tabular-nums;
+            transition: color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .stat-value.accent { color: var(--accent); }
+        .stat-value.success { color: var(--success); }
+
+        /* ═══════════ MAIN LAYOUT ═══════════ */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ═══════════ CHAT PANEL ═══════════ */
+        .chat-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            min-width: 0;
+        }
+
+        .messages {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 14px;
+            line-height: 1.6;
+            font-size: 0.92rem;
+            animation: msgIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(8px);
+        }
+
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--user-msg) 0%, var(--user-msg-hover) 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        }
+
+        .user-message:hover {
+            box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            background: linear-gradient(135deg, rgba(31, 31, 46, 0.8) 0%, rgba(28, 28, 40, 0.6) 100%);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 4px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .bot-message:hover {
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-md);
+        }
+
+        .bot-message.error-msg {
+            border-color: rgba(239, 68, 68, 0.4);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(183, 28, 28, 0.05) 100%);
+        }
+
+        .input-area {
+            padding: 18px 24px;
+            background: linear-gradient(180deg, rgba(17, 17, 26, 0.8) 0%, rgba(15, 15, 23, 0.6) 100%);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-input {
+            flex: 1;
+            background: linear-gradient(135deg, rgba(22, 22, 31, 0.6) 0%, rgba(20, 20, 30, 0.4) 100%);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 14px 18px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .chat-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow), inset 0 1px 3px rgba(0,0,0,0.2);
+            background: linear-gradient(135deg, rgba(25, 25, 35, 0.8) 0%, rgba(23, 23, 33, 0.6) 100%);
+        }
+
+        .btn {
+            border: none;
+            padding: 0 22px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-family: inherit;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-bright) 0%, var(--accent) 50%, #8b5cf6 100%);
+            color: white;
+            box-shadow: 0 4px 16px var(--accent-glow), inset 1px 1px 0 rgba(255,255,255,0.2);
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.95;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px var(--accent-glow), inset 1px 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .btn-primary:active { transform: scale(0.97) translateY(0); }
+        .btn-primary:disabled {
+            background: linear-gradient(135deg, #333 0%, #222 100%);
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            padding: 0 16px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn-ghost:hover {
+            color: var(--text-main);
+            border-color: var(--accent);
+            background: rgba(167, 139, 250, 0.08);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ═══════════ OBSERVABILITY PANEL ═══════════ */
+        .obs-panel {
+            width: 380px;
+            background-color: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .obs-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .obs-header h2 {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .obs-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(90deg, rgba(22, 22, 31, 0.4) 0%, rgba(22, 22, 31, 0.2) 100%);
+            padding: 0 2px;
+        }
+
+        .obs-tab {
+            flex: 1;
+            padding: 12px 10px;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            font-family: inherit;
+            position: relative;
+        }
+
+        .obs-tab:hover {
+            color: var(--text-main);
+            background: rgba(167, 139, 250, 0.05);
+        }
+
+        .obs-tab.active {
+            color: var(--accent-bright);
+            border-bottom-color: var(--accent);
+            box-shadow: inset 0 -3px 0 0 var(--accent);
+        }
+
+        .obs-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background: linear-gradient(180deg, rgba(15, 15, 23, 0.4) 0%, rgba(12, 12, 20, 0.2) 100%);
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* Latest Metrics */
+        .metrics-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, rgba(22, 22, 31, 0.8) 0%, rgba(20, 20, 30, 0.6) 100%);
+            border: 1px solid rgba(167, 139, 250, 0.15);
+            border-left: 4px solid var(--accent);
+            border-radius: 12px;
+            padding: 16px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 1px 1px 0 rgba(255, 255, 255, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at top-right, rgba(167, 139, 250, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 0;
+        }
+
+        .metric-card:hover {
+            border-color: rgba(167, 139, 250, 0.3);
+            border-left-color: var(--accent-bright);
+            transform: translateY(-6px);
+            box-shadow: 0 12px 24px rgba(167, 139, 250, 0.15), inset 1px 1px 0 rgba(255, 255, 255, 0.12);
+            background: linear-gradient(135deg, rgba(25, 25, 35, 0.9) 0%, rgba(23, 23, 33, 0.7) 100%);
+        }
+
+        .metric-card:hover::before {
+            opacity: 1;
+        }
+
+        .metric-card > * { position: relative; z-index: 1; }
+
+        .metric-label {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-main);
+            font-variant-numeric: tabular-nums;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .provider-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .provider-openai { background: rgba(16,163,127,0.12); color: var(--openai-color); border: 1px solid rgba(16,163,127,0.3); }
+        .provider-gemini { background: rgba(138,180,248,0.12); color: var(--gemini-color); border: 1px solid rgba(138,180,248,0.3); }
+        .provider-mock { background: rgba(248,113,113,0.12); color: var(--mock-color); border: 1px solid rgba(248,113,113,0.3); }
+        .provider-cache { background: rgba(52,211,153,0.12); color: var(--cache-color); border: 1px solid rgba(52,211,153,0.3); }
+
+        .latency-fast { color: var(--success); }
+        .latency-medium { color: var(--warning); }
+        .latency-slow { color: var(--error); }
+
+        /* Request History */
+        .history-filter-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(26, 26, 40, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-input,
+        .filter-select {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 0.85rem;
+            flex: 1;
+            min-width: 140px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: inherit;
+        }
+
+        .filter-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .filter-input:focus,
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(167, 139, 250, 0.05);
+            box-shadow: 0 0 8px rgba(167, 139, 250, 0.2);
+        }
+
+        .filter-select {
+            cursor: pointer;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            background: rgba(167, 139, 250, 0.15);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover {
+            background: rgba(167, 139, 250, 0.25);
+            box-shadow: 0 0 8px rgba(167, 139, 250, 0.2);
+        }
+
+        .filter-info {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: none;
+        }
+
+        .filter-info.active {
+            display: block;
+            padding: 8px 12px;
+            background: rgba(52, 211, 153, 0.1);
+            border-left: 2px solid var(--success);
+            border-radius: 4px;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-item {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px;
+            padding: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            animation: msgIn 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            align-items: center;
+        }
+
+        .history-item:hover {
+            border-color: var(--border-hover);
+            background: rgba(26, 26, 40, 0.8);
+            transform: translateX(2px);
+        }
+
+        .history-time {
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            grid-column: 1;
+        }
+
+        .history-provider {
+            font-weight: 600;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            grid-column: 1;
+        }
+
+        .history-latency {
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            grid-column: 2;
+            text-align: right;
+        }
+
+        .history-tokens {
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            grid-column: 2;
+            text-align: right;
+        }
+
+        .history-empty {
+            text-align: center;
+            color: var(--text-dim);
+            padding: 40px 20px;
+            font-size: 0.85rem;
+        }
+
+        /* Budget Management */
+        .budget-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(26, 26, 40, 0.5);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .budget-section h3 {
+            margin: 0 0 12px 0;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            font-weight: 600;
+        }
+
+        .budget-form {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .budget-input {
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 0.85rem;
+            flex: 1;
+            min-width: 120px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: inherit;
+        }
+
+        .budget-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .budget-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: rgba(167, 139, 250, 0.05);
+            box-shadow: 0 0 8px rgba(167, 139, 250, 0.2);
+        }
+
+        .budget-btn {
+            padding: 8px 16px;
+            background: rgba(52, 211, 153, 0.15);
+            border: 1px solid var(--success);
+            border-radius: 6px;
+            color: var(--success);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            white-space: nowrap;
+        }
+
+        .budget-btn:hover {
+            background: rgba(52, 211, 153, 0.25);
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.2);
+        }
+
+        .budget-status-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .budget-card {
+            padding: 12px;
+            background: rgba(26, 26, 40, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .budget-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+
+        .budget-card-provider {
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .budget-card-status {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .budget-card-status.ok {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--success);
+        }
+
+        .budget-card-status.warning {
+            background: rgba(251, 146, 60, 0.15);
+            color: #fb923c;
+        }
+
+        .budget-card-status.critical {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--error);
+        }
+
+        .budget-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .budget-progress-fill {
+            height: 100%;
+            background: var(--success);
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .budget-card-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .budget-empty {
+            text-align: center;
+            color: var(--text-dim);
+            padding: 30px 20px;
+            font-size: 0.85rem;
+        }
+
+        /* Loading */
+        .loading-dots {
+            display: none;
+            align-self: flex-start;
+        }
+
+        .loading-dots .message {
+            display: flex;
+            gap: 4px;
+            padding: 16px 20px;
+        }
+
+        .bounce-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .bounce-dot:nth-child(1) { animation-delay: -0.32s; }
+        .bounce-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* ═══════════ MCP ANIMATIONS ═══════════ */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { 
+                box-shadow: 0 0 0 0 currentColor;
+            }
+            50% { 
+                box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.2);
+            }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        @keyframes routeStepIn {
+            from {
+                opacity: 0;
+                transform: translateX(-4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+        /* Placeholder state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            gap: 8px;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+        }
+
+        .empty-state-icon {
+            font-size: 2rem;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ═══════════ TOP NAV BAR ═══════════ -->
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <div class="logo-icon">⚡</div>
+            <h1>Resilient <span>LLM Gateway</span></h1>
+        </div>
+        <div class="top-bar-right">
+            <div class="health-indicators" id="healthIndicators">
+                <div class="health-dot"><span class="dot" id="healthApi"></span> API</div>
+                <div class="health-dot"><span class="dot" id="healthPostgres"></span> Postgres</div>
+                <div class="health-dot"><span class="dot" id="healthRedis"></span> Redis</div>
+            </div>
+            <input type="password" id="apiKey" class="api-key-input"
+                   placeholder="Enter X-API-Key" value="test_key">
+        </div>
+    </header>
+
+    <!-- ═══════════ SESSION STATS BAR ═══════════ -->
+    <div class="stats-bar" id="statsBar">
+        <div class="stat-item">
+            <span class="stat-label">Requests</span>
+            <span class="stat-value accent" id="statRequests">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Avg Latency</span>
+            <span class="stat-value" id="statAvgLatency">— ms</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Total Tokens</span>
+            <span class="stat-value" id="statTotalTokens">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Cache Hits</span>
+            <span class="stat-value success" id="statCacheHits">0%</span>
+        </div>
+    </div>
+
+    <!-- ═══════════ MAIN LAYOUT ═══════════ -->
+    <div class="main-layout">
+        <!-- CHAT PANEL -->
+        <div class="chat-panel">
+            <div class="messages" id="chatBox">
+                <div class="message bot-message">
+                    Welcome to the Resilient LLM Gateway. Type a message to test automatic provider routing and failover. The gateway will try OpenAI → Gemini → Mock automatically.
+                </div>
+            </div>
+
+            <div class="loading-dots" id="loadingIndicator">
+                <div class="message bot-message">
+                    <span class="bounce-dot"></span>
+                    <span class="bounce-dot"></span>
+                    <span class="bounce-dot"></span>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="messageInput" class="chat-input"
+                       placeholder="Type a message and let the gateway route it..."
+                       autocomplete="off">
+                <button id="clearBtn" class="btn btn-ghost" onclick="clearChat()">Clear</button>
+                <button id="sendBtn" class="btn btn-primary" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <!-- OBSERVABILITY PANEL -->
+        <aside class="obs-panel">
+            <div class="obs-header">
+                <h2>Observability</h2>
+            </div>
+            <div class="obs-tabs">
+                <button class="obs-tab active" onclick="switchTab('latest')">Latest</button>
+                <button class="obs-tab" onclick="switchTab('history')">History</button>
+                <button class="obs-tab" onclick="switchTab('budget')">💰 Budget</button>
+            </div>
+            <div class="obs-content">
+                <!-- Latest Tab -->
+                <div class="tab-panel active" id="tabLatest">
+                    <div class="empty-state" id="metricsEmpty">
+                        <div class="empty-state-icon">📊</div>
+                        <p>Send a message to view<br/>live gateway metrics</p>
+                    </div>
+                    <div class="metrics-grid" id="metricsGrid" style="display:none;"></div>
+                </div>
+                <!-- History Tab -->
+                <div class="tab-panel" id="tabHistory">
+                    <!-- Filter Panel -->
+                    <div class="history-filter-panel">
+                        <div class="filter-row">
+                            <input 
+                                type="text" 
+                                id="historySearchInput" 
+                                class="filter-input" 
+                                placeholder="🔍 Search by content..."
+                                onchange="updateHistoryDisplay()"
+                                oninput="updateHistoryDisplay()"
+                            />
+                        </div>
+                        <div class="filter-row">
+                            <select id="filterProvider" class="filter-select" onchange="updateHistoryDisplay()">
+                                <option value="">All Providers</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="mock">Mock</option>
+                                <option value="cache">Cache</option>
+                            </select>
+                            <select id="filterModel" class="filter-select" onchange="updateHistoryDisplay()">
+                                <option value="">All Models</option>
+                            </select>
+                            <select id="filterStatus" class="filter-select" onchange="updateHistoryDisplay()">
+                                <option value="">All Status</option>
+                                <option value="success">Success ✓</option>
+                                <option value="error">Failed ✗</option>
+                            </select>
+                            <button class="filter-btn" onclick="clearHistoryFilters()">Clear Filters</button>
+                        </div>
+                        <div class="filter-info" id="filterInfo"></div>
+                    </div>
+
+                    <!-- History List -->
+                    <div class="history-list" id="historyList">
+                        <div class="history-empty">No requests yet</div>
+                    </div>
+                </div>
+                <!-- Budget Tab -->
+                <div class="tab-panel" id="tabBudget">
+                    <div class="budget-section">
+                        <h3>Budget Configuration</h3>
+                        <div class="budget-form">
+                            <select id="budgetProvider" class="budget-input">
+                                <option value="openai">OpenAI</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="all">All Providers</option>
+                            </select>
+                            <input type="number" id="budgetAmount" class="budget-input" placeholder="Monthly Budget (USD)" min="0.01" step="0.01" />
+                            <input type="number" id="warningThreshold" class="budget-input" placeholder="Warning Threshold (%)" min="0" max="100" value="80" />
+                            <button class="budget-btn" onclick="saveBudget()">Set Budget</button>
+                        </div>
+                    </div>
+                    <div class="budget-section">
+                        <h3>Current Usage</h3>
+                        <div class="budget-status-list" id="budgetStatusList">
+                            <div class="budget-empty">No budgets configured</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // ═══════════ DOM REFS ═══════════
+        const chatBox = document.getElementById('chatBox');
+        const messageInput = document.getElementById('messageInput');
+        const apiKeyInput = document.getElementById('apiKey');
+        const sendBtn = document.getElementById('sendBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const metricsGrid = document.getElementById('metricsGrid');
+        const metricsEmpty = document.getElementById('metricsEmpty');
+        const historyList = document.getElementById('historyList');
+
+        // ═══════════ SESSION STATE ═══════════
+        let chatHistory = [];
+        let sessionStats = {
+            totalRequests: 0,
+            totalLatency: 0,
+            totalTokens: 0,
+            cacheHits: 0,
+            history: []
+        };
+
+        // ═══════════ KEYBOARD HANDLER ═══════════
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // ═══════════ HEALTH CHECK ═══════════
+        async function checkHealth() {
+            try {
+                const r = await fetch('/health/detailed');
+                const data = await r.json();
+                setHealthDot('healthApi', data.api === 'ok');
+                setHealthDot('healthPostgres', data.postgres === 'ok');
+                setHealthDot('healthRedis', data.redis === 'ok');
+            } catch {
+                setHealthDot('healthApi', false);
+                setHealthDot('healthPostgres', false);
+                setHealthDot('healthRedis', false);
+            }
+        }
+
+        function setHealthDot(id, ok) {
+            const dot = document.getElementById(id);
+            dot.className = 'dot ' + (ok ? 'ok' : 'err');
+        }
+
+        // Poll health every 15s
+        checkHealth();
+        setInterval(checkHealth, 15000);
+
+        // ═══════════ TAB SWITCHING ═══════════
+        function switchTab(tab) {
+            document.querySelectorAll('.obs-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+            if (tab === 'latest') {
+                document.querySelectorAll('.obs-tab')[0].classList.add('active');
+                document.getElementById('tabLatest').classList.add('active');
+            } else if (tab === 'history') {
+                document.querySelectorAll('.obs-tab')[1].classList.add('active');
+                document.getElementById('tabHistory').classList.add('active');
+            } else if (tab === 'budget') {
+                document.querySelectorAll('.obs-tab')[2].classList.add('active');
+                document.getElementById('tabBudget').classList.add('active');
+                loadBudgetStatus(); // Load budget data when tab opens
+            }
+        }
+
+        // ═══════════ UPDATE SESSION STATS ═══════════
+        function updateSessionStats(latency, tokens, provider) {
+            sessionStats.totalRequests++;
+            sessionStats.totalLatency += latency;
+            sessionStats.totalTokens += tokens;
+            if (provider && provider.includes('cache')) sessionStats.cacheHits++;
+
+            const avg = Math.round(sessionStats.totalLatency / sessionStats.totalRequests);
+            const cacheRate = sessionStats.totalRequests > 0
+                ? Math.round((sessionStats.cacheHits / sessionStats.totalRequests) * 100)
+                : 0;
+
+            document.getElementById('statRequests').textContent = sessionStats.totalRequests;
+            document.getElementById('statTotalTokens').textContent = sessionStats.totalTokens.toLocaleString();
+            document.getElementById('statCacheHits').textContent = cacheRate + '%';
+
+            const avgEl = document.getElementById('statAvgLatency');
+            avgEl.textContent = avg + ' ms';
+            avgEl.className = 'stat-value ' + getLatencyClass(avg);
+        }
+
+        function getLatencyClass(ms) {
+            if (ms <= 2000) return 'latency-fast';
+            if (ms <= 5000) return 'latency-medium';
+            return 'latency-slow';
+        }
+
+        // ═══════════ CHAT HELPERS ═══════════
+        function appendMessage(role, content, isError) {
+            const div = document.createElement('div');
+            let classes = `message ${role}-message`;
+            if (isError) classes += ' error-msg';
+            div.className = classes;
+            div.textContent = content;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function getProviderBadge(provider) {
+            const p = (provider || 'unknown').toLowerCase();
+            let cls = 'provider-mock';
+            if (p.includes('openai')) cls = 'provider-openai';
+            else if (p.includes('gemini')) cls = 'provider-gemini';
+            else if (p.includes('cache') || p.includes('redis')) cls = 'provider-cache';
+            return `<span class="provider-badge ${cls}">${provider}</span>`;
+        }
+
+        // ═══════════ UPDATE METRICS ═══════════
+        function updateMetrics(provider, latency, tokens, model, error, routePath, costEstimate) {
+            metricsEmpty.style.display = 'none';
+            metricsGrid.style.display = 'flex';
+
+            if (error) {
+                metricsGrid.innerHTML = `
+                    <div class="metric-card" style="border-color:rgba(248,113,113,0.3);">
+                        <span class="metric-label">Status</span>
+                        <span class="metric-value" style="color:var(--error);">Failed</span>
+                        <p style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">${error}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const latClass = getLatencyClass(latency);
+            
+            // Build route visualization (MCP-style)
+            let routeHTML = '';
+            if (routePath && routePath.length > 0) {
+                const successStep = routePath.find(s => s.status === 'success');
+                routeHTML = `
+                    <div class="metric-card" style="grid-column: 1/-1; padding: 16px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 1.2rem;">🛣️</span>
+                            <span class="metric-label" style="margin: 0; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">Route Path</span>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            ${successStep ? `<div style="color: var(--success); font-weight: 600; margin-bottom: 12px; font-size: 0.9rem; letter-spacing: 0.3px;">✓ Resolved via ${successStep.provider.toUpperCase()}</div>` : ''}
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                `;
+                
+                routePath.forEach((step, idx) => {
+                    const statusColor = step.status === 'success' ? 'var(--success)' : 'var(--error)';
+                    const statusIcon = step.status === 'success' ? '✓' : '✗';
+                    routeHTML += `
+                        <div style="padding: 10px 12px; background: rgba(255,255,255,0.03); border-left: 3px solid ${statusColor}; border-radius: 6px; font-size: 0.88rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="font-weight: 600; letter-spacing: 0.3px;">${step.provider.toUpperCase()} <span style="font-weight: 400; color: var(--text-muted);">(Attempt ${idx + 1})</span></span>
+                                <span style="color: ${statusColor}; font-weight: 700; font-size: 1rem;">${statusIcon}</span>
+                            </div>
+                            <div style="color: var(--text-muted); font-size: 0.8rem; font-variant-numeric: tabular-nums;">Req: <span style="color: var(--text-main);">${step.requested_model}</span> → Res: <span style="color: var(--text-main);">${step.resolved_model || 'N/A'}</span></div>
+                        </div>
+                    `;
+                });
+                
+                routeHTML += `</div></div></div>`;
+            }
+            
+            // Build cost visualization (MCP-style with enhanced styling)
+            let costHTML = '';
+            if (costEstimate) {
+                const formatCost = (val) => val < 0.000001 ? '<0.000001' : val.toFixed(7);
+                
+                // Calculate savings
+                const openaiCost = costEstimate.openai_usd;
+                const geminiCost = costEstimate.gemini_usd;
+                const usedCost = costEstimate.provider_used_usd;
+                const maxAlternative = Math.max(openaiCost, geminiCost);
+                const savings = maxAlternative - usedCost;
+                const savingsPercent = maxAlternative > 0 ? ((savings / maxAlternative) * 100).toFixed(1) : 0;
+                
+                costHTML = `
+                    <div class="metric-card" style="grid-column: 1/-1; padding: 0; overflow: hidden; background: linear-gradient(135deg, rgba(52,211,153,0.05), rgba(167,139,250,0.05)); border: 1px solid rgba(52,211,153,0.2);">
+                        <!-- Header -->
+                        <div style="padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.2);">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+                                    <span style="font-size: 1.2rem; flex-shrink: 0;">💰</span>
+                                    <div style="min-width: 0;">
+                                        <span class="metric-label" style="margin: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px;">Cost Estimate</span>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; white-space: nowrap;">Est. pricing comparison</div>
+                                    </div>
+                                </div>
+                                ${savings > 0 ? `<div style="background: rgba(52,211,153,0.2); border: 1px solid rgba(52,211,153,0.4); padding: 5px 10px; border-radius: 16px; font-size: 0.7rem; font-weight: 700; color: var(--success); white-space: nowrap; flex-shrink: 0;">Save ${savingsPercent}%</div>` : ''}
+                            </div>
+                        </div>
+                        
+                        <!-- Cost Cards Grid -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0;">
+                            <!-- OpenAI Card -->
+                            <div style="padding: 14px; border-right: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px; min-width: 0;">
+                                    <span style="font-size: 0.95rem; flex-shrink: 0;">🤖</span>
+                                    <div style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.2px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">OpenAI</div>
+                                </div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: var(--openai-color); font-family: 'Courier New', monospace; letter-spacing: 0.02em; word-break: break-all;">$${formatCost(openaiCost)}</div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">gpt-3.5-turbo</div>
+                            </div>
+                            
+                            <!-- Gemini Card -->
+                            <div style="padding: 14px; border-right: 1px solid rgba(255,255,255,0.05); transition: all 0.3s ease; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px; min-width: 0;">
+                                    <span style="font-size: 0.95rem; flex-shrink: 0;">✨</span>
+                                    <div style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.2px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gemini</div>
+                                </div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: var(--gemini-color); font-family: 'Courier New', monospace; letter-spacing: 0.02em; word-break: break-all;">$${formatCost(geminiCost)}</div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">gemini-2.0-flash</div>
+                            </div>
+                            
+                            <!-- Used Card (Highlighted) -->
+                            <div style="padding: 14px; background: linear-gradient(135deg, rgba(52,211,153,0.08), rgba(52,211,153,0.03)); position: relative; min-width: 0;">
+                                <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--success), transparent);">
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 6px; min-width: 0;">
+                                    <span style="font-size: 0.95rem; flex-shrink: 0;">✓</span>
+                                    <div style="color: var(--success); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.2px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Active</div>
+                                </div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: var(--success); font-family: 'Courier New', monospace; letter-spacing: 0.02em; word-break: break-all;">$${formatCost(usedCost)}</div>
+                                <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="selectedProvider">—</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Cost Breakdown Footer -->
+                        <div style="padding: 10px 14px; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; gap: 8px; flex-wrap: wrap;">
+                            <div style="color: var(--text-muted);">Cost per request</div>
+                            ${savings > 0 ? `<div style="color: var(--success); font-weight: 700; white-space: nowrap;">💚 Save $${savings.toFixed(7)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            metricsGrid.innerHTML = `
+                <div class="metric-card">
+                    <span class="metric-label">Resolved Provider</span>
+                    ${getProviderBadge(provider)}
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Model</span>
+                    <span class="metric-value" style="font-size:1rem;">${model || 'N/A'}</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Roundtrip Latency</span>
+                    <span class="metric-value ${latClass}">${latency.toLocaleString()} ms</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Token Usage</span>
+                    <span class="metric-value">${tokens}</span>
+                </div>
+                ${routeHTML}
+                ${costHTML}
+            `;
+
+            // Update selected provider display in cost card
+            setTimeout(() => {
+                const selectedProviderEl = document.getElementById('selectedProvider');
+                if (selectedProviderEl && provider) {
+                    const providerNames = {
+                        'openai': 'gpt-3.5-turbo',
+                        'gemini': 'gemini-2.0-flash',
+                        'mock': 'mock-model'
+                    };
+                    selectedProviderEl.textContent = providerNames[provider.toLowerCase()] || provider;
+                }
+            }, 50);
+        }
+
+        // ═══════════ UPDATE HISTORY ═══════════
+        function addHistoryEntry(provider, latency, tokens, status, routePath, costEstimate) {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const p = (provider || 'unknown').toLowerCase();
+
+            // Extract model from route_path or fallback to unknown
+            let model = 'unknown';
+            if (routePath && routePath.length > 0) {
+                const successStep = routePath.find(s => s.status === 'success');
+                if (successStep && successStep.resolved_model) {
+                    model = successStep.resolved_model;
+                } else if (routePath[0].requested_model) {
+                    model = routePath[0].requested_model;
+                }
+            }
+
+            // Store complete history entry
+            const historyEntry = {
+                timestamp: now,
+                provider: provider,
+                model: model,
+                latency: latency,
+                tokens: tokens,
+                status: status,
+                success: status === 200,
+                routePath: routePath,
+                costEstimate: costEstimate
+            };
+            
+            sessionStats.history.unshift(historyEntry); // Add to front
+
+            let provClass = 'color:var(--mock-color)';
+            if (p.includes('openai')) provClass = 'color:var(--openai-color)';
+            else if (p.includes('gemini')) provClass = 'color:var(--gemini-color)';
+            else if (p.includes('cache') || p.includes('redis')) provClass = 'color:var(--cache-color)';
+
+            const latClass = getLatencyClass(latency);
+            const statusIcon = status === 200 ? '✓' : '✗';
+            const statusColor = status === 200 ? 'var(--success)' : 'var(--error)';
+
+            // Build detailed history entry with expandable route/cost
+            const entry = document.createElement('div');
+            entry.className = 'history-item';
+            
+            const routeSummary = routePath && routePath.length > 0 
+                ? `${routePath.length} step${routePath.length > 1 ? 's' : ''}`
+                : 'N/A';
+            const costSummary = costEstimate 
+                ? `$${costEstimate.provider_used_usd.toFixed(7)}`
+                : 'N/A';
+            
+            entry.innerHTML = `
+                <span class="history-time">${time}</span>
+                <span class="history-provider" style="${provClass}">${(provider || 'unknown').toUpperCase()}</span>
+                <span style="font-size: 0.7rem; color: var(--text-muted); grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis;">${model}</span>
+                <span class="history-latency ${latClass}">${latency} ms</span>
+                <span class="history-tokens" style="grid-column: 2; text-align: right;">${tokens}t</span>
+                <span style="font-size: 0.7rem; color: var(--success); grid-column: 1;">📍 ${routeSummary}</span>
+                <span style="font-size: 0.7rem; color: var(--accent); grid-column: 2; text-align: right;">💰 ${costSummary}</span>
+            `;
+
+            // Replace empty state or prepend
+            if (historyList.querySelector('.history-empty')) {
+                historyList.innerHTML = '';
+            }
+            historyList.prepend(entry);
+            
+            // Update model dropdown
+            updateModelDropdown();
+            
+            // Apply current filters
+            updateHistoryDisplay();
+        }
+
+        // ═══════════ UPDATE MODEL DROPDOWN ═══════════
+        function updateModelDropdown() {
+            const models = new Set();
+            sessionStats.history.forEach(entry => {
+                if (entry.model && entry.model !== 'unknown') {
+                    models.add(entry.model);
+                }
+            });
+
+            const filterModel = document.getElementById('filterModel');
+            const currentValue = filterModel.value;
+            const options = Array.from(models).sort();
+
+            // Clear existing options (except the first "All Models")
+            while (filterModel.options.length > 1) {
+                filterModel.remove(1);
+            }
+
+            // Add new options
+            options.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.toLowerCase();
+                option.textContent = model;
+                filterModel.appendChild(option);
+            });
+
+            // Restore previous value if still exists
+            if (currentValue && filterModel.querySelector(`option[value="${currentValue}"]`)) {
+                filterModel.value = currentValue;
+            }
+        }
+
+        // ═══════════ UPDATE HISTORY DISPLAY (WITH FILTERING) ═══════════
+        function updateHistoryDisplay() {
+            const searchTerm = document.getElementById('historySearchInput').value.toLowerCase();
+            const filterProvider = document.getElementById('filterProvider').value.toLowerCase();
+            const filterModel = document.getElementById('filterModel').value.toLowerCase();
+            const filterStatus = document.getElementById('filterStatus').value.toLowerCase();
+            const filterInfo = document.getElementById('filterInfo');
+
+            // Filter the history
+            let filtered = sessionStats.history.filter(entry => {
+                // Provider filter
+                if (filterProvider && !entry.provider.toLowerCase().includes(filterProvider)) {
+                    return false;
+                }
+
+                // Model filter
+                if (filterModel && entry.model.toLowerCase() !== filterModel) {
+                    return false;
+                }
+
+                // Status filter
+                if (filterStatus === 'success' && !entry.success) {
+                    return false;
+                }
+                if (filterStatus === 'error' && entry.success) {
+                    return false;
+                }
+
+                // Search filter (search in provider, model, and route path info)
+                if (searchTerm) {
+                    const searchText = `${entry.provider} ${entry.model}`.toLowerCase();
+                    if (!searchText.includes(searchTerm)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            // Update filter info
+            const hasActiveFilters = filterProvider || filterModel || filterStatus || searchTerm;
+            if (hasActiveFilters) {
+                filterInfo.classList.add('active');
+                filterInfo.textContent = `Showing ${filtered.length} of ${sessionStats.history.length} requests`;
+            } else {
+                filterInfo.classList.remove('active');
+            }
+
+            // Render filtered history
+            historyList.innerHTML = '';
+
+            if (filtered.length === 0) {
+                historyList.innerHTML = `<div class="history-empty">${hasActiveFilters ? 'No matching requests' : 'No requests yet'}</div>`;
+                return;
+            }
+
+            filtered.forEach(entry => {
+                const time = entry.timestamp.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const p = (entry.provider || 'unknown').toLowerCase();
+
+                let provClass = 'color:var(--mock-color)';
+                if (p.includes('openai')) provClass = 'color:var(--openai-color)';
+                else if (p.includes('gemini')) provClass = 'color:var(--gemini-color)';
+                else if (p.includes('cache') || p.includes('redis')) provClass = 'color:var(--cache-color)';
+
+                const latClass = getLatencyClass(entry.latency);
+                const routeSummary = entry.routePath && entry.routePath.length > 0
+                    ? `${entry.routePath.length} step${entry.routePath.length > 1 ? 's' : ''}`
+                    : 'N/A';
+                const costSummary = entry.costEstimate
+                    ? `$${entry.costEstimate.provider_used_usd.toFixed(7)}`
+                    : 'N/A';
+
+                const entryEl = document.createElement('div');
+                entryEl.className = 'history-item';
+                entryEl.innerHTML = `
+                    <span class="history-time">${time}</span>
+                    <span class="history-provider" style="${provClass}">${(entry.provider || 'unknown').toUpperCase()}</span>
+                    <span style="font-size: 0.7rem; color: var(--text-muted); grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis;">${entry.model}</span>
+                    <span class="history-latency ${latClass}">${entry.latency} ms</span>
+                    <span class="history-tokens" style="grid-column: 2; text-align: right;">${entry.tokens}t</span>
+                    <span style="font-size: 0.7rem; color: var(--success); grid-column: 1;">📍 ${routeSummary}</span>
+                    <span style="font-size: 0.7rem; color: var(--accent); grid-column: 2; text-align: right;">💰 ${costSummary}</span>
+                `;
+                historyList.appendChild(entryEl);
+            });
+        }
+
+        // ═══════════ CLEAR FILTERS ═══════════
+        function clearHistoryFilters() {
+            document.getElementById('historySearchInput').value = '';
+            document.getElementById('filterProvider').value = '';
+            document.getElementById('filterModel').value = '';
+            document.getElementById('filterStatus').value = '';
+            updateHistoryDisplay();
+        }
+
+        // ═══════════ CLEAR CHAT ═══════════
+        function clearChat() {
+            chatBox.innerHTML = `
+                <div class="message bot-message">
+                    Chat cleared. Send a new message to continue testing.
+                </div>
+            `;
+            chatHistory = [];
+            sessionStats = { totalRequests: 0, totalLatency: 0, totalTokens: 0, cacheHits: 0, history: [] };
+
+            document.getElementById('statRequests').textContent = '0';
+            document.getElementById('statAvgLatency').textContent = '— ms';
+            document.getElementById('statAvgLatency').className = 'stat-value';
+            document.getElementById('statTotalTokens').textContent = '0';
+            document.getElementById('statCacheHits').textContent = '0%';
+
+            metricsGrid.style.display = 'none';
+            metricsEmpty.style.display = 'flex';
+            
+            // Clear filters and history display
+            clearHistoryFilters();
+            historyList.innerHTML = '<div class="history-empty">No requests yet</div>';
+        }
+
+        // ═══════════ BUDGET MANAGEMENT ═══════════
+        async function saveBudget() {
+            const provider = document.getElementById('budgetProvider').value;
+            const amount = parseFloat(document.getElementById('budgetAmount').value);
+            const threshold = parseFloat(document.getElementById('warningThreshold').value) || 80;
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid budget amount');
+                return;
+            }
+
+            if (!apiKey) {
+                alert('Please enter your X-API-Key');
+                return;
+            }
+
+            try {
+                // Build query string for POST request
+                const params = new URLSearchParams({
+                    provider: provider,
+                    monthly_budget_usd: amount,
+                    warning_threshold_percent: threshold,
+                });
+
+                const response = await fetch(`/budget?${params.toString()}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-API-Key': apiKey,
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+
+                const data = await response.json();
+                console.log('Budget saved:', data);
+                
+                // Clear form
+                document.getElementById('budgetAmount').value = '';
+                document.getElementById('warningThreshold').value = '80';
+                
+                // Reload budget status
+                await loadBudgetStatus();
+                alert(`Budget set for ${provider}: $${amount.toFixed(2)}/month`);
+            } catch (err) {
+                console.error('Error saving budget:', err);
+                alert(`Error saving budget: ${err.message}`);
+            }
+        }
+
+        async function loadBudgetStatus() {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) return;
+
+            try {
+                const response = await fetch('/budget/status', {
+                    headers: {
+                        'X-API-Key': apiKey,
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+
+                const data = await response.json();
+                const statusList = document.getElementById('budgetStatusList');
+                
+                const status = data.status || {};
+                if (Object.keys(status).length === 0) {
+                    statusList.innerHTML = '<div class="budget-empty">No budgets configured. Set a budget above to start tracking costs.</div>';
+                    return;
+                }
+
+                let html = '';
+                for (const [provider, info] of Object.entries(status)) {
+                    const percent = info.percent;
+                    const statusClass = info.status;
+                    const statusText = statusClass === 'critical' ? '🚨 CRITICAL' : (statusClass === 'warning' ? '⚠️  WARNING' : '✓ OK');
+                    
+                    html += `
+                        <div class="budget-card">
+                            <div class="budget-card-header">
+                                <span class="budget-card-provider">${provider.toUpperCase()}</span>
+                                <span class="budget-card-status ${statusClass}">${statusText}</span>
+                            </div>
+                            <div class="budget-progress-bar">
+                                <div class="budget-progress-fill" style="width: ${Math.min(percent, 100)}%; background: ${
+                                    statusClass === 'critical' ? 'var(--error)' : (statusClass === 'warning' ? '#fb923c' : 'var(--success)')
+                                };"></div>
+                            </div>
+                            <div class="budget-card-stats">
+                                <span>$${info.spent.toFixed(8)} / $${info.budget.toFixed(2)}</span>
+                                <span>${info.percent.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                statusList.innerHTML = html;
+            } catch (err) {
+                console.error('Error loading budget status:', err);
+                document.getElementById('budgetStatusList').innerHTML = '<div class="budget-empty">Error loading budget status</div>';
+            }
+        }
+
+        // ═══════════ SEND MESSAGE ═══════════
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!content) return;
+            if (!apiKey) {
+                alert("Please enter your X-API-Key");
+                apiKeyInput.focus();
+                return;
+            }
+
+            // Disable UI
+            messageInput.value = '';
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+
+            // Show user message + loading
+            appendMessage('user', content);
+            chatHistory.push({ role: "user", content: content });
+            loadingIndicator.style.display = 'block';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const startTime = performance.now();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify({
+                        messages: chatHistory,
+                        model: "gpt-3.5-turbo"
+                    })
+                });
+
+                const latency = Math.round(performance.now() - startTime);
+                const data = await response.json();
+                loadingIndicator.style.display = 'none';
+
+                if (!response.ok) {
+                    appendMessage('bot', `Error: ${data.detail || 'Unknown server error'}`, true);
+                    updateMetrics(null, latency, 0, null, data.detail);
+                    addHistoryEntry('error', latency, 0, response.status);
+                    updateSessionStats(latency, 0, 'error');
+                    chatHistory.pop();
+                } else {
+                    appendMessage('bot', data.content);
+                    chatHistory.push({ role: "assistant", content: data.content });
+
+                    const totalTokens = data.usage ? data.usage.total_tokens : 0;
+                    
+                    // Pass route_path and cost_estimate to updateMetrics
+                    updateMetrics(
+                        data.provider, 
+                        latency, 
+                        totalTokens, 
+                        data.model,
+                        null,
+                        data.route_path,
+                        data.cost_estimate
+                    );
+                    
+                    // Pass route_path and cost_estimate to addHistoryEntry
+                    addHistoryEntry(
+                        data.provider, 
+                        latency, 
+                        totalTokens, 
+                        200,
+                        data.route_path,
+                        data.cost_estimate
+                    );
+                    
+                    updateSessionStats(latency, totalTokens, data.provider);
+                }
+
+            } catch (err) {
+                loadingIndicator.style.display = 'none';
+                appendMessage('bot', `Connection Error: ${err.message}`, true);
+                updateMetrics(null, 0, 0, null, err.message);
+                chatHistory.pop();
+            }
+
+            // Re-enable UI
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            messageInput.focus();
+        }
+    </script>
+</body>
+</html>
