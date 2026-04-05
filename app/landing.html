@@ -380,6 +380,160 @@
             opacity: 0.8;
         }
 
+        /* ═══════════ TECHNOLOGY STACK SECTION ═══════════ */
+        .tech-stack-container {
+            background: linear-gradient(180deg, rgba(167,139,250,0.05) 0%, rgba(59,130,246,0.03) 100%);
+            border-top: 1px solid rgba(167,139,250,0.1);
+            border-bottom: 1px solid rgba(167,139,250,0.1);
+            overflow: hidden;
+        }
+
+        .tech-stack-section {
+            padding: 80px 60px;
+        }
+
+        .tech-stack-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 60px;
+            color: var(--text-main);
+        }
+
+        .tech-scroll-container {
+            position: relative;
+            overflow: hidden;
+            margin: 60px 0;
+        }
+
+        .tech-scroll-track {
+            display: flex;
+            gap: 30px;
+            animation: scroll-left 25s linear infinite;
+            width: fit-content;
+            padding: 20px 0;
+        }
+
+        .tech-scroll-track:hover {
+            animation-play-state: paused;
+        }
+
+        /* Clone the animation */
+        .tech-scroll-track-clone {
+            display: flex;
+            gap: 30px;
+            animation: scroll-left 25s linear infinite;
+            width: fit-content;
+            padding: 20px 0;
+        }
+
+        @keyframes scroll-left {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
+        }
+
+        @keyframes scroll-right {
+            0% {
+                transform: translateX(-50%);
+            }
+            100% {
+                transform: translateX(0);
+            }
+        }
+
+        .tech-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 30px;
+            background: linear-gradient(135deg, rgba(22,22,31,0.8) 0%, rgba(20,20,30,0.6) 100%);
+            border: 1px solid rgba(167,139,250,0.2);
+            border-radius: 16px;
+            white-space: nowrap;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+            min-width: 160px;
+            flex-shrink: 0;
+        }
+
+        .tech-item:hover {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(25,25,35,0.9) 0%, rgba(23,23,33,0.7) 100%);
+            transform: translateY(-8px);
+            box-shadow: 0 12px 32px rgba(167,139,250,0.2);
+        }
+
+        .tech-icon {
+            font-size: 2.5rem;
+            transition: transform 0.3s;
+        }
+
+        .tech-item:hover .tech-icon {
+            transform: scale(1.2) rotate(5deg);
+        }
+
+        .tech-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+            text-align: center;
+        }
+
+        .tech-category {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .tech-scroll-row {
+            margin: 30px 0;
+            display: none;
+        }
+
+        .tech-scroll-row:nth-child(odd) .tech-scroll-track {
+            animation-direction: normal;
+        }
+
+        .tech-scroll-row:nth-child(even) .tech-scroll-track {
+            animation-direction: reverse;
+        }
+
+        .tech-scroll-row:nth-child(even) .tech-scroll-track-clone {
+            animation-direction: reverse;
+        }
+
+        .tech-fade-left {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 100px;
+            background: linear-gradient(90deg, var(--bg-color) 0%, transparent 100%);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .tech-fade-right {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 100px;
+            background: linear-gradient(90deg, transparent 0%, var(--bg-color) 100%);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .tech-scroll-wrapper {
+            position: relative;
+        }
+
         /* ═══════════ FEATURES SECTION ═══════════ */
         .section {
             padding: 100px 60px;
@@ -918,6 +1072,83 @@
             <a href="/features" class="btn-secondary">Explore All Features →</a>
         </div>
     </section>
+
+    <!-- Technology Stack Section -->
+    <div class="tech-stack-container">
+        <section class="tech-stack-section">
+            <h2 class="tech-stack-title">Technology Stack</h2>
+            
+            <div class="tech-scroll-wrapper">
+                <div class="tech-fade-left"></div>
+                <div class="tech-scroll-container">
+                    <div class="tech-scroll-track">
+                        <div class="tech-item">
+                            <div class="tech-icon">🐍</div>
+                            <div class="tech-name">FastAPI</div>
+                            <div class="tech-category">Backend</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">🗄️</div>
+                            <div class="tech-name">PostgreSQL</div>
+                            <div class="tech-category">Data</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">⚡</div>
+                            <div class="tech-name">Redis</div>
+                            <div class="tech-category">Caching</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">🐳</div>
+                            <div class="tech-name">Docker Compose</div>
+                            <div class="tech-category">Hosting</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">💻</div>
+                            <div class="tech-name">HTML/CSS/JS</div>
+                            <div class="tech-category">Frontend</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">🔐</div>
+                            <div class="tech-name">JWT Auth</div>
+                            <div class="tech-category">Security</div>
+                        </div>
+                        <!-- Duplicated for seamless scroll -->
+                        <div class="tech-item">
+                            <div class="tech-icon">🐍</div>
+                            <div class="tech-name">FastAPI</div>
+                            <div class="tech-category">Backend</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">🗄️</div>
+                            <div class="tech-name">PostgreSQL</div>
+                            <div class="tech-category">Data</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">⚡</div>
+                            <div class="tech-name">Redis</div>
+                            <div class="tech-category">Caching</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">🐳</div>
+                            <div class="tech-name">Docker Compose</div>
+                            <div class="tech-category">Hosting</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">💻</div>
+                            <div class="tech-name">HTML/CSS/JS</div>
+                            <div class="tech-category">Frontend</div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-icon">🔐</div>
+                            <div class="tech-name">JWT Auth</div>
+                            <div class="tech-category">Security</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tech-fade-right"></div>
+            </div>
+        </section>
+    </div>
 
     <!-- How It Works Section -->
     <section class="section">
