@@ -150,7 +150,7 @@ def call_gemini(request: ChatRequest) -> ChatResponse:
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
     # Map the requested model to a Gemini model name
-    gemini_model = request.model if request.model.startswith("gemini") else "gemini-2.0-flash"
+    gemini_model = request.model if request.model.startswith("gemini") else "gemini-1.5-flash"
 
     def _call():
         model = genai.GenerativeModel(gemini_model)

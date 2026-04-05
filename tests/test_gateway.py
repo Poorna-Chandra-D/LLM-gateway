@@ -34,7 +34,7 @@ MOCK_RESPONSE = ChatResponse(
 MOCK_GEMINI_RESPONSE = ChatResponse(
     content="Hello from Gemini!",
     provider="gemini",
-    model="gemini-2.0-flash",
+    model="gemini-1.5-flash",
     usage=UsageStats(prompt_tokens=10, completion_tokens=6, total_tokens=16),
 )
 

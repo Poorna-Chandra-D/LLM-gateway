@@ -211,7 +211,7 @@ Determines whether to prefer OpenAI or Gemini based on:
 
 #### Gemini Adapter (`call_gemini()`)
 - Uses `google.generativeai` client
-- Maps requested model to Gemini model (defaults to "gemini-2.0-flash")
+- Maps requested model to Gemini model (defaults to "gemini-1.5-flash")
 - Combines messages into single prompt (Gemini uses simpler interface)
 - Calls `model.generate_content()` with generation_config (temperature, max_output_tokens)
 - Returns ChatResponse with:

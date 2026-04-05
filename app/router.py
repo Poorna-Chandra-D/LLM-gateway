@@ -102,7 +102,7 @@ def _select_provider_order(request: ChatRequest) -> List[str]:
 
 def _expected_model(provider: str, requested_model: str) -> str:
     if provider == "gemini":
-        return requested_model if requested_model.startswith("gemini") else "gemini-2.0-flash"
+        return requested_model if requested_model.startswith("gemini") else "gemini-1.5-flash"
     return requested_model
 
 
