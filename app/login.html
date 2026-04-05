@@ -63,6 +63,17 @@
             margin-bottom: 40px;
         }
 
+        .logo-link {
+            display: inline-block;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .logo-link:hover {
+            transform: scale(1.05);
+        }
+
         .logo-icon {
             width: 64px;
             height: 64px;
@@ -76,6 +87,12 @@
             color: white;
             box-shadow: 0 8px 32px var(--accent-glow);
             margin: 0 auto 20px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .logo-link:hover .logo-icon {
+            box-shadow: 0 12px 40px rgba(167,139,250,0.4);
+            transform: translateY(-2px);
         }
 
         .logo-text h2 {
@@ -128,6 +145,26 @@
         .login-form {
             width: 100%;
             max-width: 400px;
+        }
+
+        .home-link {
+            display: inline-block;
+            margin-bottom: 30px;
+            padding: 8px 16px;
+            background: rgba(167,139,250,0.1);
+            border: 1px solid rgba(167,139,250,0.2);
+            border-radius: 8px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .home-link:hover {
+            background: rgba(167,139,250,0.15);
+            border-color: rgba(167,139,250,0.4);
+            transform: translateX(-2px);
         }
 
         .form-header {
@@ -397,9 +434,11 @@
         <div class="login-marketing">
             <div class="marketing-content">
                 <div class="logo-section">
-                    <div class="logo-icon">⚡</div>
+                    <a href="/landing" class="logo-link" title="Back to Home">
+                        <div class="logo-icon">⚡</div>
+                    </a>
                     <div class="logo-text">
-                        <h2>LLM Gateway</h2>
+                        <h2><a href="/landing" style="text-decoration: none; color: inherit; transition: opacity 0.3s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">LLM Gateway</a></h2>
                         <p>Intelligent routing, cost optimization, and resilient failover for your LLM workloads</p>
                     </div>
                 </div>
@@ -432,6 +471,7 @@
         <!-- Right Side -->
         <div class="login-form-section">
             <div class="login-form">
+                <a href="/landing" class="home-link">← Back to Home</a>
                 <div class="form-header">
                     <h1>Welcome Back</h1>
                     <p>Sign in to your account to continue</p>
